@@ -30,6 +30,12 @@ interface UploadModalProps {
 
 const CATEGORIES = ['WINGS', 'PET', 'AURA', 'HEADWEAR', 'FACE', 'BACK', 'FISTS', 'BOOTS'] as const;
 const SLOTS = ['BODY', 'PET', 'HEAD', 'ARMS', 'LEGS'] as const;
+const IMAGE_EXTENSIONS = ['.png', '.apng', '.webp', '.gif', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff'];
+
+function isImageFile(fn: string): boolean {
+  const lower = fn.toLowerCase();
+  return IMAGE_EXTENSIONS.some((ext) => lower.endsWith(ext));
+}
 
 export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuccess }) => {
   const [dragActive, setDragActive] = useState(false);
@@ -155,13 +161,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
       }
       if (inspectRes.suggestedSlot) setSlot(inspectRes.suggestedSlot);
 
-      // If user uploaded a thumbnail in this batch and none selected yet
+      // Auto-populate thumbnail file
       if (!thumbnailFile) {
-        const thumb = names.find(
-          (n) => n.toLowerCase().includes('thumb') || (inspectRes.files.some((f) => f.relativePath === n && f.type === 'texture'))
-        );
-        if (thumb) {
-          setThumbnailFile(thumb);
+        if (inspectRes.suggestedThumbnail) {
+          setThumbnailFile(inspectRes.suggestedThumbnail);
+        } else {
+          const thumb = names.find((n) => isImageFile(n));
+          if (thumb) {
+            setThumbnailFile(thumb);
+          }
         }
       }
     } catch (err: any) {
@@ -195,6 +203,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
         setInspection(inspectRes);
         if (!modelFile && inspectRes.suggestedModel) setModelFile(inspectRes.suggestedModel);
         if (!textureFile && inspectRes.suggestedTexture) setTextureFile(inspectRes.suggestedTexture);
+        if (!thumbnailFile && inspectRes.suggestedThumbnail) setThumbnailFile(inspectRes.suggestedThumbnail);
       } else {
         setInspection(null);
       }
@@ -366,7 +375,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
               {uploading ? 'Uploading and analyzing assets...' : 'Drop models, textures, animations, or ZIP archive'}
             </div>
             <div className="dropzone-desc">
-              Supports .geo.json, .bbmodel, .png, .webp, .animation.json • Multiple uploads allowed
+              Supports .geo.json, .bbmodel, animations & textures (.png, .webp, .gif, .apng, .jpg, .bmp, .tiff) • Multiple uploads allowed
             </div>
           </div>
 
@@ -389,14 +398,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
                     fn.endsWith('.bbmodel') ||
                     (fn.endsWith('.json') && !fn.includes('anim') && !fn.includes('manifest'));
                   const isAnim = fn.includes('anim') || fn.endsWith('.animation.json');
-                  const isTex = fn.endsWith('.png') || fn.endsWith('.webp');
+                  const isTex = isImageFile(fn);
                   const isManifest = fn === 'manifest.json';
+                  const inspected = inspection?.files.find((f) => f.relativePath === fn);
 
                   return (
                     <div key={fn} className="file-item-row">
                       <div className="file-item-info">
                         {isModel && <Box size={15} color="#818cf8" />}
-                        {isTex && <ImageIcon size={15} color="#34d399" />}
+                        {isTex && <ImageIcon size={15} color={inspected?.isAnimatedImage ? '#38bdf8' : '#34d399'} />}
                         {isAnim && <Film size={15} color="#fbbf24" />}
                         {!isModel && !isTex && !isAnim && <FileCode size={15} color="#94a3b8" />}
                         <span className="file-item-name" title={fn}>
@@ -406,7 +416,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
                           {isModel
                             ? 'Model'
                             : isTex
-                            ? 'Texture'
+                            ? inspected?.imageFormat
+                              ? `${inspected.imageFormat}${inspected.isAnimatedImage ? ' (Anim)' : ''}`
+                              : 'Texture'
                             : isAnim
                             ? 'Animation'
                             : isManifest
@@ -426,6 +438,30 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Animated Texture Banner if detected */}
+          {inspection?.hasAnimatedTexture && (
+            <div
+              style={{
+                backgroundColor: 'rgba(56, 189, 248, 0.1)',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                color: '#bae6fd',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.6rem',
+                margin: '0.75rem 0',
+                padding: '0.7rem 0.9rem',
+                borderRadius: '8px',
+                fontSize: '0.86rem',
+                lineHeight: 1.4
+              }}
+            >
+              <ImageIcon size={18} color="#38bdf8" style={{ flexShrink: 0 }} />
+              <span>
+                <strong>Animated Texture:</strong> Detected {inspection.animatedTextureFormat} texture format. The Cozmetics Universal Image Decoder supports animated textures dynamically in-game!
+              </span>
             </div>
           )}
 
@@ -519,7 +555,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
             </div>
 
             <div className="form-group">
-              <label className="form-label">Texture File (.png or .webp)</label>
+              <label className="form-label">Texture File (PNG, APNG, WebP, GIF, JPEG, BMP, TIFF)</label>
               <select
                 className="form-control"
                 value={textureFile}
@@ -527,18 +563,24 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
               >
                 <option value="">-- Choose Texture File --</option>
                 {uploadedFiles
-                  .filter((f) => f.endsWith('.png') || f.endsWith('.webp'))
-                  .map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
+                  .filter((f) => isImageFile(f))
+                  .map((f) => {
+                    const inspected = inspection?.files.find((file) => file.relativePath === f);
+                    const tag = inspected?.imageFormat
+                      ? ` [${inspected.imageFormat}${inspected.isAnimatedImage ? ' • Animated' : ''}]`
+                      : '';
+                    return (
+                      <option key={f} value={f}>
+                        {f}{tag}
+                      </option>
+                    );
+                  })}
               </select>
             </div>
 
-            {/* Static Card Thumbnail */}
+            {/* Static / Animated Card Thumbnail */}
             <div className="form-group">
-              <label className="form-label">Card Thumbnail Image (PNG / WebP)</label>
+              <label className="form-label">Card Thumbnail (PNG, WebP, GIF, APNG, JPEG, BMP, TIFF)</label>
               <select
                 className="form-control"
                 value={thumbnailFile}
@@ -546,12 +588,18 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
               >
                 <option value="">-- Select Uploaded Thumbnail --</option>
                 {uploadedFiles
-                  .filter((f) => f.endsWith('.png') || f.endsWith('.webp'))
-                  .map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
+                  .filter((f) => isImageFile(f))
+                  .map((f) => {
+                    const inspected = inspection?.files.find((file) => file.relativePath === f);
+                    const tag = inspected?.imageFormat
+                      ? ` [${inspected.imageFormat}${inspected.isAnimatedImage ? ' • Animated' : ''}]`
+                      : '';
+                    return (
+                      <option key={f} value={f}>
+                        {f}{tag}
+                      </option>
+                    );
+                  })}
               </select>
             </div>
 

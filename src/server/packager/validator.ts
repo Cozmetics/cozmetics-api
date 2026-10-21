@@ -8,7 +8,20 @@ export const MAX_SINGLE_ENTRY_UNCOMPRESSED_SIZE = 10 * 1024 * 1024; // 10 MB
 export const MAX_TOTAL_UNCOMPRESSED_SIZE = 30 * 1024 * 1024; // 30 MB
 export const MAX_ENTRY_COUNT = 60;
 
-export const ALLOWED_EXTENSIONS = new Set(['json', 'bbmodel', 'png', 'webp', 'mcmeta']);
+export const ALLOWED_EXTENSIONS = new Set([
+  'json',
+  'bbmodel',
+  'png',
+  'apng',
+  'webp',
+  'gif',
+  'jpg',
+  'jpeg',
+  'bmp',
+  'tif',
+  'tiff',
+  'mcmeta'
+]);
 export const ALLOWED_SLOTS = new Set(['PET', 'BODY', 'HEAD', 'ARMS', 'LEGS']);
 export const ALLOWED_CATEGORIES = new Set([
   'PET', 'WINGS', 'AURA', 'HEADWEAR', 'FACE', 'BACK', 'FISTS', 'BOOTS'

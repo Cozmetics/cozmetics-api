@@ -159,7 +159,18 @@ export function registerPublicRoutes(fastify: FastifyInstance, repo: Repository,
       }
 
       const ext = path.extname(filename).toLowerCase();
-      const contentType = ext === '.webp' ? 'image/webp' : ext === '.png' ? 'image/png' : 'application/octet-stream';
+      const MIME_MAP: Record<string, string> = {
+        '.png': 'image/png',
+        '.apng': 'image/apng',
+        '.webp': 'image/webp',
+        '.gif': 'image/gif',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.bmp': 'image/bmp',
+        '.tif': 'image/tiff',
+        '.tiff': 'image/tiff'
+      };
+      const contentType = MIME_MAP[ext] || 'application/octet-stream';
 
       reply.header('Content-Type', contentType);
       reply.header('Cache-Control', 'public, max-age=86400');

@@ -1,12 +1,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import AdmZip from 'adm-zip';
+import {
+  detectImageFormat,
+  SUPPORTED_IMAGE_EXTENSIONS,
+  DetectedImageFormat
+} from './imageDetector.js';
 
 export interface InspectedAssetFile {
   relativePath: string;
   size: number;
   extension: string;
   type: 'model' | 'texture' | 'animation' | 'meta' | 'manifest' | 'unknown';
+  imageFormat?: DetectedImageFormat;
+  isAnimatedImage?: boolean;
 }
 
 export interface InspectionResult {
@@ -14,9 +21,12 @@ export interface InspectionResult {
   suggestedModel?: string;
   suggestedTexture?: string;
   suggestedAnimation?: string;
+  suggestedThumbnail?: string;
   discoveredAnimations: string[];
   suggestedIdleAnimation?: string;
   isAnimated: boolean;
+  hasAnimatedTexture?: boolean;
+  animatedTextureFormat?: string;
   suggestedCategory?: string;
   suggestedSlot?: string;
   modelFormat?: 'bedrock_geo' | 'blockbench';
@@ -79,12 +89,15 @@ export function inspectDirectoryOrZip(targetPath: string): InspectionResult {
   // Analyze files
   const candidateModels: string[] = [];
   const candidateTextures: string[] = [];
+  const candidateThumbnails: string[] = [];
   const candidateAnimations: string[] = [];
 
   for (const [relPath, buffer] of tempFilesMap.entries()) {
     const ext = path.extname(relPath).toLowerCase().replace('.', '');
     const filename = path.basename(relPath).toLowerCase();
     let type: InspectedAssetFile['type'] = 'unknown';
+    let imageFormat: DetectedImageFormat | undefined;
+    let isAnimatedImage = false;
 
     if (filename === 'manifest.json') {
       type = 'manifest';
@@ -92,9 +105,28 @@ export function inspectDirectoryOrZip(targetPath: string): InspectionResult {
       type = 'model';
       candidateModels.push(relPath);
       result.modelFormat = 'blockbench';
-    } else if (ext === 'png' || ext === 'webp') {
+    } else if (SUPPORTED_IMAGE_EXTENSIONS.has(ext)) {
       type = 'texture';
-      candidateTextures.push(relPath);
+      const imgInfo = detectImageFormat(buffer);
+      imageFormat = imgInfo.format;
+      isAnimatedImage = imgInfo.isAnimated;
+
+      if (imgInfo.isAnimated) {
+        result.hasAnimatedTexture = true;
+        result.animatedTextureFormat = imgInfo.format;
+      }
+
+      const isLikelyThumbnail =
+        filename.includes('thumb') ||
+        filename.includes('card') ||
+        filename.includes('icon') ||
+        filename.includes('preview');
+
+      if (isLikelyThumbnail) {
+        candidateThumbnails.push(relPath);
+      } else {
+        candidateTextures.push(relPath);
+      }
     } else if (ext === 'json') {
       // Differentiate between geo, animation, meta
       try {
@@ -127,16 +159,24 @@ export function inspectDirectoryOrZip(targetPath: string): InspectionResult {
       relativePath: relPath,
       size: buffer.length,
       extension: ext,
-      type
+      type,
+      imageFormat,
+      isAnimatedImage
     });
   }
 
-  // Determine suggestions
+  // Model suggestions
   if (candidateModels.length === 1) {
     result.suggestedModel = candidateModels[0];
   } else if (candidateModels.length > 1) {
     result.warnings.push(`Multiple model files found (${candidateModels.join(', ')}). Admin selection required.`);
     result.suggestedModel = candidateModels[0];
+  }
+
+  // Texture and thumbnail suggestions
+  if (candidateTextures.length === 0 && candidateThumbnails.length > 0) {
+    // If only thumbnail candidates exist, fall back to them for model texture
+    candidateTextures.push(...candidateThumbnails);
   }
 
   if (candidateTextures.length === 1) {
@@ -146,6 +186,13 @@ export function inspectDirectoryOrZip(targetPath: string): InspectionResult {
     result.suggestedTexture = candidateTextures[0];
   }
 
+  if (candidateThumbnails.length > 0) {
+    result.suggestedThumbnail = candidateThumbnails[0];
+  } else if (candidateTextures.length > 0) {
+    result.suggestedThumbnail = candidateTextures[0];
+  }
+
+  // Animation suggestions
   if (candidateAnimations.length > 0) {
     result.isAnimated = true;
     result.suggestedAnimation = candidateAnimations[0];
@@ -159,7 +206,7 @@ export function inspectDirectoryOrZip(targetPath: string): InspectionResult {
     }
   }
 
-  // Determine suggested category and slot from names
+  // Category and slot suggestions
   const allNames = Array.from(tempFilesMap.keys()).map((k) => k.toLowerCase()).join(' ');
   if (allNames.includes('wing')) {
     result.suggestedCategory = 'WINGS';
@@ -189,4 +236,3 @@ export function inspectDirectoryOrZip(targetPath: string): InspectionResult {
 
   return result;
 }
-
