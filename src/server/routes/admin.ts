@@ -36,17 +36,18 @@ export function registerAdminRoutes(fastify: FastifyInstance, repo: Repository, 
       }
     },
     async (request: FastifyRequest<{ Body: { username?: string; password?: string } }>, reply: FastifyReply) => {
-      const { username, password } = request.body || {};
-      if (!username || !password) {
+      const rawUsername = request.body?.username?.trim();
+      const rawPassword = request.body?.password?.trim();
+      if (!rawUsername || !rawPassword) {
         return reply.status(400).send({ error: 'Bad Request', message: 'Username and password required' });
       }
 
-      const admin = repo.getAdminByUsername(username);
+      const admin = repo.getAdminByUsername(rawUsername);
       if (!admin) {
         return reply.status(401).send({ error: 'Unauthorized', message: 'Invalid credentials' });
       }
 
-      const isValid = verifyPassword(password, admin.password_hash, admin.salt);
+      const isValid = verifyPassword(rawPassword, admin.password_hash, admin.salt);
       if (!isValid) {
         return reply.status(401).send({ error: 'Unauthorized', message: 'Invalid credentials' });
       }
