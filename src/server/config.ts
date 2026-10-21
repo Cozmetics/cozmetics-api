@@ -14,6 +14,8 @@ export interface AppConfig {
   isProduction: boolean;
 }
 
+export const DEFAULT_PRODUCTION_DOMAIN = 'https://catalog.cozmetics.arcn.online';
+
 export function loadConfig(): AppConfig {
   const port = parseInt(process.env.PORT || '3001', 10);
   const host = process.env.HOST || '0.0.0.0';
@@ -23,8 +25,8 @@ export function loadConfig(): AppConfig {
   const tempDir = path.join(dataDir, 'temp');
   const dbPath = path.join(dataDir, 'metadata.db');
   const sessionSecret = process.env.SESSION_SECRET || 'cozmetics-secret-key-change-in-prod-' + crypto.randomBytes(16).toString('hex');
-  const baseUrl = (process.env.BASE_URL || `http://localhost:${port}`).replace(/\/+$/, '');
-  const isProduction = process.env.NODE_ENV === 'production';
+  const baseUrl = (process.env.BASE_URL || DEFAULT_PRODUCTION_DOMAIN).replace(/\/+$/, '');
+  const isProduction = process.env.NODE_ENV === 'production' || baseUrl.includes('cozmetics.arcn.online');
 
   return {
     port,

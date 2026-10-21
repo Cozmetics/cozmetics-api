@@ -59,7 +59,7 @@ export function registerAdminRoutes(fastify: FastifyInstance, repo: Repository, 
       reply.setCookie('cozmetics_session', token, {
         path: '/',
         httpOnly: true,
-        secure: config.isProduction,
+        secure: request.headers['x-forwarded-proto'] === 'https' || request.protocol === 'https' || (config.isProduction && !request.headers.host?.includes('localhost')),
         sameSite: 'lax',
         maxAge: Math.floor(SESSION_TTL_MS / 1000)
       });

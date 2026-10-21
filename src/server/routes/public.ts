@@ -27,9 +27,10 @@ export function registerPublicRoutes(fastify: FastifyInstance, repo: Repository,
     }
 
     const host = request.headers.host || `localhost:${config.port}`;
-    const proto = request.headers['x-forwarded-proto'] || (config.isProduction ? 'https' : 'http');
-    const dynamicBaseUrl = `${proto}://${host}`;
-    const effectiveBaseUrl = config.baseUrl.includes('localhost') ? dynamicBaseUrl : config.baseUrl;
+    const proto = request.headers['x-forwarded-proto'] || (host.includes('localhost') ? 'http' : (config.isProduction ? 'https' : 'http'));
+    const effectiveBaseUrl = (host.includes('localhost') || host.includes('127.0.0.1'))
+      ? `${proto}://${host}`
+      : config.baseUrl;
 
     const published = repo.getPublishedCosmetics();
 
@@ -80,9 +81,10 @@ export function registerPublicRoutes(fastify: FastifyInstance, repo: Repository,
     }
 
     const host = request.headers.host || `localhost:${config.port}`;
-    const proto = request.headers['x-forwarded-proto'] || (config.isProduction ? 'https' : 'http');
-    const dynamicBaseUrl = `${proto}://${host}`;
-    const effectiveBaseUrl = config.baseUrl.includes('localhost') ? dynamicBaseUrl : config.baseUrl;
+    const proto = request.headers['x-forwarded-proto'] || (host.includes('localhost') ? 'http' : (config.isProduction ? 'https' : 'http'));
+    const effectiveBaseUrl = (host.includes('localhost') || host.includes('127.0.0.1'))
+      ? `${proto}://${host}`
+      : config.baseUrl;
 
     return reply.send({
       id: item.id,

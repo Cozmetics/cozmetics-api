@@ -1,6 +1,54 @@
+# Dependencies
 node_modules/
-dist/
-data/
-.env
-*.log
+.pnp
+.pnp.js
 
+# Build Outputs
+dist/
+build/
+*.tsbuildinfo
+
+# Persistent Data & Databases
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Environment & Secrets
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Temporary Uploads & Stash
+temp/
+tmp/
+*.tmp
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Archive & Packaging Bundles
+*.tar.gz
+*.tar
+*.tgz
+*.zip
+*.7z
+
+# Large Raw Assets & Scratch Files
+cozmetics-*.tar.gz
+src/client/public/cozmetics_dark_full.png
+
+# Operating System & Editor Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
