@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Plus, LogIn, LogOut, ShieldCheck, ExternalLink } from 'lucide-react';
+import { Plus, LogIn, LogOut, ShieldCheck, ExternalLink } from 'lucide-react';
 
 interface NavbarProps {
   isAdmin: boolean;
@@ -19,11 +19,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <nav className="navbar">
       <div className="brand">
-        <div className="brand-icon">
-          <Sparkles size={18} />
-        </div>
-        <div className="brand-title">Cozmetics Studio</div>
-        <span className="brand-badge">Publishing Engine</span>
+        <img src="/logo.png" alt="Cozmetics" className="brand-logo" />
+        <span className="brand-tag">Studio</span>
       </div>
 
       <div className="nav-actions">
@@ -71,4 +68,3 @@ export const Navbar: React.FC<NavbarProps> = ({
     </nav>
   );
 };
-

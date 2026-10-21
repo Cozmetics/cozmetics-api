@@ -13,7 +13,7 @@ import {
   deletePackage
 } from './api.js';
 import { CosmeticItem } from './types.js';
-import { Search, Sparkles, Filter, RefreshCw } from 'lucide-react';
+import { Search, Filter, RefreshCw, PackageOpen } from 'lucide-react';
 
 const CATEGORIES = ['ALL', 'WINGS', 'PET', 'AURA', 'HEADWEAR', 'FACE', 'BACK', 'FISTS', 'BOOTS'] as const;
 
@@ -201,9 +201,11 @@ export const App: React.FC = () => {
               borderRadius: '12px'
             }}
           >
-            <Sparkles size={40} color="#6366f1" style={{ marginBottom: '1rem' }} />
-            <h3 style={{ fontSize: '1.25rem', marginBottom: '0.5rem' }}>No Cosmetics Found</h3>
-            <p style={{ color: 'var(--text-muted)', maxWidth: '420px', margin: '0 auto 1.5rem auto', fontSize: '0.9rem' }}>
+            <PackageOpen size={44} color="#64748b" style={{ marginBottom: '1rem' }} />
+            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '0.5rem', color: '#f1f5f9' }}>
+              No Cosmetics Published
+            </h3>
+            <p style={{ color: 'var(--text-muted)', maxWidth: '440px', margin: '0 auto 1.5rem auto', fontSize: '0.9rem', lineHeight: 1.6 }}>
               {items.length === 0
                 ? 'The catalogue is currently empty. Sign in as an admin to upload, configure, and publish cosmetics for the Minecraft mod.'
                 : 'No cosmetics match your current search and category filters.'}
