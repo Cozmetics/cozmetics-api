@@ -14,7 +14,7 @@ export interface AppConfig {
   isProduction: boolean;
 }
 
-export const DEFAULT_PRODUCTION_DOMAIN = 'https://catalog.cozmetics.arcn.online';
+export const DEFAULT_PRODUCTION_DOMAIN = 'https://cozmetics.arcn.online';
 
 export function loadConfig(): AppConfig {
   const port = parseInt(process.env.PORT || '3001', 10);
