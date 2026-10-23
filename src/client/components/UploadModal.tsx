@@ -65,6 +65,8 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
   const [translateY, setTranslateY] = useState(0.0);
   const [scale, setScale] = useState(1.0);
   const [staticLighting, setStaticLighting] = useState(false);
+  const [showTextureOverride, setShowTextureOverride] = useState(false);
+  const [activePreset, setActivePreset] = useState<string | null>(null);
 
   // Status & Validation
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -98,9 +100,45 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
     setTranslateY(0.0);
     setScale(1.0);
     setStaticLighting(false);
+    setShowTextureOverride(false);
+    setActivePreset(null);
     setManifestPreview(null);
     setErrorMsg(null);
     setSuccessMsg(null);
+  };
+
+  const applyPreset = (presetKey: string) => {
+    setActivePreset(presetKey);
+    switch (presetKey) {
+      case 'shoulder':
+        setScale(0.35);
+        setTranslateY(0.65);
+        setSlot('BODY');
+        setCategory('PET');
+        break;
+      case 'floating':
+        setScale(0.40);
+        setTranslateY(0.40);
+        setSlot('PET');
+        setCategory('PET');
+        break;
+      case 'head':
+        setScale(0.70);
+        setTranslateY(0.00);
+        setSlot('HEAD');
+        setCategory('HEADWEAR');
+        break;
+      case 'held':
+        setScale(0.50);
+        setTranslateY(0.00);
+        setSlot('ARMS');
+        setCategory('FISTS');
+        break;
+      case 'full':
+        setScale(1.00);
+        setTranslateY(0.00);
+        break;
+    }
   };
 
   // Reset form when modal opens or closes
@@ -148,6 +186,11 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
       const inspectRes = await inspectUploadedFiles(uploadRes.uploadId);
       setInspection(inspectRes);
 
+      // Include all session files, including auto-extracted textures from .bbmodel
+      if (inspectRes.files && inspectRes.files.length > 0) {
+        setUploadedFiles(inspectRes.files.map((f: any) => f.relativePath));
+      }
+
       // Auto-populate fields if currently unselected
       if (!modelFile && inspectRes.suggestedModel) setModelFile(inspectRes.suggestedModel);
       if (!textureFile && inspectRes.suggestedTexture) setTextureFile(inspectRes.suggestedTexture);
@@ -160,6 +203,21 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
         setCategory(inspectRes.suggestedCategory);
       }
       if (inspectRes.suggestedSlot) setSlot(inspectRes.suggestedSlot);
+
+      // Auto-populate scale and translate Y if suggested
+      if (inspectRes.suggestedScale !== undefined) {
+        setScale(inspectRes.suggestedScale);
+      }
+      if (inspectRes.suggestedTranslateY !== undefined) {
+        setTranslateY(inspectRes.suggestedTranslateY);
+      }
+      if (inspectRes.modelFormat === 'blockbench') {
+        if (inspectRes.suggestedScale === 0.35 || inspectRes.suggestedScale === 0.45) {
+          setActivePreset('shoulder');
+        } else if (inspectRes.suggestedSlot === 'HEAD') {
+          setActivePreset('head');
+        }
+      }
 
       // Auto-populate thumbnail file
       if (!thumbnailFile) {
@@ -201,6 +259,9 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
       if (remainingNames.length > 0) {
         const inspectRes = await inspectUploadedFiles(uploadId);
         setInspection(inspectRes);
+        if (inspectRes.files && inspectRes.files.length > 0) {
+          setUploadedFiles(inspectRes.files.map((f: any) => f.relativePath));
+        }
         if (!modelFile && inspectRes.suggestedModel) setModelFile(inspectRes.suggestedModel);
         if (!textureFile && inspectRes.suggestedTexture) setTextureFile(inspectRes.suggestedTexture);
         if (!thumbnailFile && inspectRes.suggestedThumbnail) setThumbnailFile(inspectRes.suggestedThumbnail);
@@ -477,6 +538,19 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
             </div>
           )}
 
+          {/* Blockbench 3D Model Banner if detected */}
+          {((modelFile || '').toLowerCase().endsWith('.bbmodel') || inspection?.modelFormat === 'blockbench') && (
+            <div className="bbmodel-banner">
+              <div className="bbmodel-banner-header">
+                <Box size={18} color="#818cf8" />
+                <span>Blockbench Model Detected (.bbmodel)</span>
+              </div>
+              <p className="bbmodel-banner-text">
+                Embedded textures and animations are handled automatically. Redundant manual pickers (.animation.json) have been hidden.
+              </p>
+            </div>
+          )}
+
           {/* 2. Configuration Form */}
           <div className="form-grid">
             <div className="form-group">
@@ -535,7 +609,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
               </select>
             </div>
 
-            {/* Model & Texture Selection */}
+            {/* Model Selection */}
             <div className="form-group">
               <label className="form-label">Model File (.geo.json or .bbmodel)</label>
               <select
@@ -554,29 +628,75 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
               </select>
             </div>
 
-            <div className="form-group">
-              <label className="form-label">Texture File (PNG, APNG, WebP, GIF, JPEG, BMP, TIFF)</label>
-              <select
-                className="form-control"
-                value={textureFile}
-                onChange={(e) => setTextureFile(e.target.value)}
-              >
-                <option value="">-- Choose Texture File --</option>
-                {uploadedFiles
-                  .filter((f) => isImageFile(f))
-                  .map((f) => {
-                    const inspected = inspection?.files.find((file) => file.relativePath === f);
-                    const tag = inspected?.imageFormat
-                      ? ` [${inspected.imageFormat}${inspected.isAnimatedImage ? ' • Animated' : ''}]`
-                      : '';
-                    return (
-                      <option key={f} value={f}>
-                        {f}{tag}
-                      </option>
-                    );
-                  })}
-              </select>
-            </div>
+            {/* Texture File Selection */}
+            {((modelFile || '').toLowerCase().endsWith('.bbmodel') || inspection?.modelFormat === 'blockbench') && textureFile ? (
+              <div className="form-group">
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <label className="form-label">Texture File</label>
+                  <button
+                    type="button"
+                    className="btn-text-action"
+                    onClick={() => setShowTextureOverride(!showTextureOverride)}
+                  >
+                    {showTextureOverride ? 'Use embedded texture' : 'Override texture file'}
+                  </button>
+                </div>
+                {!showTextureOverride ? (
+                  <div className="embedded-asset-pill">
+                    <CheckCircle2 size={16} color="#10b981" />
+                    <div className="embedded-asset-info">
+                      <span className="embedded-asset-title">Auto-extracted from .bbmodel</span>
+                      <span className="embedded-asset-sub">{textureFile}</span>
+                    </div>
+                  </div>
+                ) : (
+                  <select
+                    className="form-control"
+                    value={textureFile}
+                    onChange={(e) => setTextureFile(e.target.value)}
+                  >
+                    <option value="">-- Choose Texture File --</option>
+                    {uploadedFiles
+                      .filter((f) => isImageFile(f))
+                      .map((f) => {
+                        const inspected = inspection?.files.find((file) => file.relativePath === f);
+                        const tag = inspected?.imageFormat
+                          ? ` [${inspected.imageFormat}${inspected.isAnimatedImage ? ' • Animated' : ''}]`
+                          : '';
+                        return (
+                          <option key={f} value={f}>
+                            {f}{tag}
+                          </option>
+                        );
+                      })}
+                  </select>
+                )}
+              </div>
+            ) : (
+              <div className="form-group">
+                <label className="form-label">Texture File (PNG, APNG, WebP, GIF, JPEG, BMP, TIFF)</label>
+                <select
+                  className="form-control"
+                  value={textureFile}
+                  onChange={(e) => setTextureFile(e.target.value)}
+                >
+                  <option value="">-- Choose Texture File --</option>
+                  {uploadedFiles
+                    .filter((f) => isImageFile(f))
+                    .map((f) => {
+                      const inspected = inspection?.files.find((file) => file.relativePath === f);
+                      const tag = inspected?.imageFormat
+                        ? ` [${inspected.imageFormat}${inspected.isAnimatedImage ? ' • Animated' : ''}]`
+                        : '';
+                      return (
+                        <option key={f} value={f}>
+                          {f}{tag}
+                        </option>
+                      );
+                    })}
+                </select>
+              </div>
+            )}
 
             {/* Static / Animated Card Thumbnail */}
             <div className="form-group">
@@ -594,9 +714,10 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
                     const tag = inspected?.imageFormat
                       ? ` [${inspected.imageFormat}${inspected.isAnimatedImage ? ' • Animated' : ''}]`
                       : '';
+                    const isExtracted = f === textureFile && ((modelFile || '').toLowerCase().endsWith('.bbmodel') || inspection?.modelFormat === 'blockbench');
                     return (
                       <option key={f} value={f}>
-                        {f}{tag}
+                        {f}{isExtracted ? ' (Auto-extracted texture)' : tag}
                       </option>
                     );
                   })}
@@ -613,43 +734,32 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
               />
             </div>
 
-            {/* Animation Toggle */}
-            <div className="form-group full-width" style={{ marginTop: '0.5rem' }}>
-              <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={isAnimated}
-                  onChange={(e) => setIsAnimated(e.target.checked)}
-                  style={{ width: '18px', height: '18px', accentColor: '#6366f1' }}
-                />
-                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>This cosmetic is animated</span>
-              </label>
-            </div>
-
-            {/* Conditional Animation Fields */}
-            {isAnimated && (
+            {/* Animation Section: If BBModel, hide external .animation.json picker! */}
+            {((modelFile || '').toLowerCase().endsWith('.bbmodel') || inspection?.modelFormat === 'blockbench') ? (
               <>
-                <div className="form-group">
-                  <label className="form-label">Animation File (.animation.json)</label>
-                  <select
-                    className="form-control"
-                    value={animationFile}
-                    onChange={(e) => setAnimationFile(e.target.value)}
+                <div className="form-group full-width" style={{ marginTop: '0.5rem' }}>
+                  <div
+                    className="embedded-asset-pill"
+                    style={{
+                      backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                      borderColor: 'rgba(99, 102, 241, 0.3)'
+                    }}
                   >
-                    <option value="">-- Choose Animation File --</option>
-                    {uploadedFiles
-                      .filter((f) => f.endsWith('.json'))
-                      .map((f) => (
-                        <option key={f} value={f}>
-                          {f}
-                        </option>
-                      ))}
-                  </select>
+                    <Film size={16} color="#818cf8" />
+                    <div className="embedded-asset-info">
+                      <span className="embedded-asset-title">Embedded Animations (.bbmodel)</span>
+                      <span className="embedded-asset-sub">
+                        {inspection?.discoveredAnimations && inspection.discoveredAnimations.length > 0
+                          ? `Found ${inspection.discoveredAnimations.length} animation(s) directly in 3D model: [${inspection.discoveredAnimations.join(', ')}]. No external .animation.json required!`
+                          : 'No embedded animations detected in this .bbmodel file.'}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Idle Animation Identifier</label>
-                  {inspection?.discoveredAnimations && inspection.discoveredAnimations.length > 0 ? (
+                {inspection?.discoveredAnimations && inspection.discoveredAnimations.length > 0 && (
+                  <div className="form-group full-width">
+                    <label className="form-label">Idle Animation Identifier</label>
                     <select
                       className="form-control"
                       value={idleAnimation}
@@ -662,41 +772,208 @@ export const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSuc
                         </option>
                       ))}
                     </select>
-                  ) : (
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="form-group full-width" style={{ marginTop: '0.5rem' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }}>
                     <input
-                      type="text"
-                      className="form-control"
-                      placeholder="e.g. animation.demon2024BloodDragonWings.idle"
-                      value={idleAnimation}
-                      onChange={(e) => setIdleAnimation(e.target.value)}
+                      type="checkbox"
+                      checked={isAnimated}
+                      onChange={(e) => setIsAnimated(e.target.checked)}
+                      style={{ width: '18px', height: '18px', accentColor: '#6366f1' }}
                     />
-                  )}
+                    <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>This cosmetic is animated</span>
+                  </label>
                 </div>
+
+                {isAnimated && (
+                  <>
+                    <div className="form-group">
+                      <label className="form-label">Animation File (.animation.json)</label>
+                      <select
+                        className="form-control"
+                        value={animationFile}
+                        onChange={(e) => setAnimationFile(e.target.value)}
+                      >
+                        <option value="">-- Choose Animation File --</option>
+                        {uploadedFiles
+                          .filter((f) => f.endsWith('.json'))
+                          .map((f) => (
+                            <option key={f} value={f}>
+                              {f}
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+
+                    <div className="form-group">
+                      <label className="form-label">Idle Animation Identifier</label>
+                      {inspection?.discoveredAnimations && inspection.discoveredAnimations.length > 0 ? (
+                        <select
+                          className="form-control"
+                          value={idleAnimation}
+                          onChange={(e) => setIdleAnimation(e.target.value)}
+                        >
+                          <option value="">-- Select Idle Animation --</option>
+                          {inspection.discoveredAnimations.map((anim) => (
+                            <option key={anim} value={anim}>
+                              {anim}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          type="text"
+                          className="form-control"
+                          placeholder="e.g. animation.demon2024BloodDragonWings.idle"
+                          value={idleAnimation}
+                          onChange={(e) => setIdleAnimation(e.target.value)}
+                        />
+                      )}
+                    </div>
+                  </>
+                )}
               </>
             )}
 
-            {/* Transforms */}
+            {/* Transform & Sizing Presets */}
+            <div className="form-group full-width transform-presets-container">
+              <div className="presets-header">
+                <label className="form-label" style={{ marginBottom: 0 }}>
+                  Scale & Position Presets
+                </label>
+                <span className="presets-hint">
+                  {((modelFile || '').toLowerCase().endsWith('.bbmodel') || inspection?.modelFormat === 'blockbench')
+                    ? 'Blockbench models are large by default. Select a preset to fit player attachments perfectly:'
+                    : 'Quickly set scale and positioning for player attachments:'}
+                </span>
+              </div>
+              <div className="presets-buttons-grid">
+                <button
+                  type="button"
+                  className={`preset-btn ${activePreset === 'shoulder' ? 'active' : ''}`}
+                  onClick={() => applyPreset('shoulder')}
+                >
+                  <span className="preset-btn-icon">🦜</span>
+                  <div className="preset-btn-info">
+                    <span className="preset-btn-title">Shoulder Pet</span>
+                    <span className="preset-btn-sub">Scale 0.35 • Y +0.65 • BODY</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`preset-btn ${activePreset === 'floating' ? 'active' : ''}`}
+                  onClick={() => applyPreset('floating')}
+                >
+                  <span className="preset-btn-icon">🐾</span>
+                  <div className="preset-btn-info">
+                    <span className="preset-btn-title">Floating Pet</span>
+                    <span className="preset-btn-sub">Scale 0.40 • Y +0.40 • PET</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`preset-btn ${activePreset === 'head' ? 'active' : ''}`}
+                  onClick={() => applyPreset('head')}
+                >
+                  <span className="preset-btn-icon">🎩</span>
+                  <div className="preset-btn-info">
+                    <span className="preset-btn-title">Headwear / Hat</span>
+                    <span className="preset-btn-sub">Scale 0.70 • Y 0.00 • HEAD</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`preset-btn ${activePreset === 'held' ? 'active' : ''}`}
+                  onClick={() => applyPreset('held')}
+                >
+                  <span className="preset-btn-icon">⚔️</span>
+                  <div className="preset-btn-info">
+                    <span className="preset-btn-title">Handheld Item</span>
+                    <span className="preset-btn-sub">Scale 0.50 • Y 0.00 • ARMS</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  className={`preset-btn ${activePreset === 'full' ? 'active' : ''}`}
+                  onClick={() => applyPreset('full')}
+                >
+                  <span className="preset-btn-icon">📐</span>
+                  <div className="preset-btn-info">
+                    <span className="preset-btn-title">Original (1.0x)</span>
+                    <span className="preset-btn-sub">Scale 1.00 • Y 0.00</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* Transforms with Sliders and Number Inputs */}
             <div className="form-group">
-              <label className="form-label">Translate Y Offset</label>
-              <input
-                type="number"
-                step="0.05"
-                className="form-control"
-                value={translateY}
-                onChange={(e) => setTranslateY(parseFloat(e.target.value) || 0.0)}
-              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="form-label">Scale Factor</label>
+                <span style={{ fontSize: '0.8rem', color: '#a5b4fc', fontFamily: 'var(--font-mono)' }}>{scale.toFixed(2)}x</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="2.5"
+                  step="0.05"
+                  value={scale}
+                  onChange={(e) => {
+                    setScale(parseFloat(e.target.value));
+                    setActivePreset('custom');
+                  }}
+                  style={{ flex: 1, accentColor: '#6366f1' }}
+                />
+                <input
+                  type="number"
+                  step="0.05"
+                  min="0.05"
+                  className="form-control"
+                  style={{ width: '90px' }}
+                  value={scale}
+                  onChange={(e) => {
+                    setScale(parseFloat(e.target.value) || 1.0);
+                    setActivePreset('custom');
+                  }}
+                />
+              </div>
             </div>
 
             <div className="form-group">
-              <label className="form-label">Scale Factor</label>
-              <input
-                type="number"
-                step="0.1"
-                min="0.1"
-                className="form-control"
-                value={scale}
-                onChange={(e) => setScale(parseFloat(e.target.value) || 1.0)}
-              />
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <label className="form-label">Translate Y Offset</label>
+                <span style={{ fontSize: '0.8rem', color: '#a5b4fc', fontFamily: 'var(--font-mono)' }}>{translateY.toFixed(2)}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <input
+                  type="range"
+                  min="-1.5"
+                  max="1.5"
+                  step="0.05"
+                  value={translateY}
+                  onChange={(e) => {
+                    setTranslateY(parseFloat(e.target.value));
+                    setActivePreset('custom');
+                  }}
+                  style={{ flex: 1, accentColor: '#6366f1' }}
+                />
+                <input
+                  type="number"
+                  step="0.05"
+                  className="form-control"
+                  style={{ width: '90px' }}
+                  value={translateY}
+                  onChange={(e) => {
+                    setTranslateY(parseFloat(e.target.value) || 0.0);
+                    setActivePreset('custom');
+                  }}
+                />
+              </div>
             </div>
 
             <div className="form-group full-width">

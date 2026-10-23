@@ -44,6 +44,11 @@ export interface InspectionData {
   suggestedCategory?: string;
   suggestedSlot?: string;
   modelFormat?: 'bedrock_geo' | 'blockbench';
+  hasEmbeddedTextures?: boolean;
+  hasEmbeddedAnimations?: boolean;
+  extractedTextureFilename?: string;
+  suggestedScale?: number;
+  suggestedTranslateY?: number;
   errors: string[];
   warnings: string[];
 }

@@ -87,7 +87,10 @@ export async function buildCosmeticPackage(input: BuildPackageInput): Promise<Bu
   ];
 
   if (animationZipPath && input.animation) {
-    entries.push({ name: animationZipPath, buffer: input.animation.buffer });
+    // Only add if animation file is distinct from the model file (e.g. .animation.json vs embedded in .bbmodel)
+    if (animationZipPath !== modelZipPath && !entries.some((e) => e.name === animationZipPath)) {
+      entries.push({ name: animationZipPath, buffer: input.animation.buffer });
+    }
   }
 
   if (input.extraFiles) {

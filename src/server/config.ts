@@ -17,6 +17,14 @@ export interface AppConfig {
 export const DEFAULT_PRODUCTION_DOMAIN = 'https://cozmetics.arcn.online';
 
 export function loadConfig(): AppConfig {
+  if (typeof (process as any).loadEnvFile === 'function') {
+    try {
+      (process as any).loadEnvFile();
+    } catch {
+      // .env is optional
+    }
+  }
+
   const port = parseInt(process.env.PORT || '3001', 10);
   const host = process.env.HOST || '0.0.0.0';
   const dataDir = path.resolve(process.env.DATA_DIR || path.join(process.cwd(), 'data'));

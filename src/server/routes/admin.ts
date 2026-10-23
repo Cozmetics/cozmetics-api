@@ -301,11 +301,13 @@ export function registerAdminRoutes(fastify: FastifyInstance, repo: Repository, 
         }
       }
 
+      const isBbModel = (data.modelFile || '').toLowerCase().endsWith('.bbmodel');
+
       // Check animation file if animated
       if (data.isAnimated) {
-        if (!data.animationFile) {
+        if (!data.animationFile && !isBbModel) {
           errors.push('Animation file is required for animated cosmetics');
-        } else {
+        } else if (data.animationFile) {
           const animPath = path.join(targetDir, path.basename(data.animationFile));
           if (!fs.existsSync(animPath)) {
             errors.push(`Animation file '${data.animationFile}' not found in uploaded assets`);
@@ -337,8 +339,11 @@ export function registerAdminRoutes(fastify: FastifyInstance, repo: Repository, 
         }
       };
 
-      if (data.isAnimated && data.animationFile) {
-        manifestPreview.animation = path.basename(data.animationFile);
+      if (data.isAnimated) {
+        const animFilename = data.animationFile || (isBbModel ? path.basename(data.modelFile) : undefined);
+        if (animFilename) {
+          manifestPreview.animation = path.basename(animFilename);
+        }
         if (data.idleAnimation) {
           manifestPreview.idle_animation = data.idleAnimation;
         }
@@ -413,11 +418,14 @@ export function registerAdminRoutes(fastify: FastifyInstance, repo: Repository, 
       const textureBuffer = fs.readFileSync(texturePath);
 
       let animData: { filename: string; buffer: Buffer; idleAnimation?: string } | undefined;
-      if (data.isAnimated && data.animationFile) {
-        const animPath = path.join(targetDir, path.basename(data.animationFile));
+      const isBbModel = data.modelFile.toLowerCase().endsWith('.bbmodel');
+      const animFilename = data.animationFile || (isBbModel && data.isAnimated ? data.modelFile : undefined);
+
+      if (data.isAnimated && animFilename) {
+        const animPath = path.join(targetDir, path.basename(animFilename));
         if (fs.existsSync(animPath)) {
           animData = {
-            filename: path.basename(data.animationFile),
+            filename: path.basename(animFilename),
             buffer: fs.readFileSync(animPath),
             idleAnimation: data.idleAnimation
           };
